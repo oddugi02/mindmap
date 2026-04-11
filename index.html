@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>트리 마인드맵</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- Top Toolbar -->
+<div id="toolbar">
+  <div id="tb-start">
+    <button class="tb-btn action primary" id="btn-new" title="새로운 마인드맵 만들기">+</button>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <span class="tb-label">크기</span>
+    <button class="tb-btn" id="sz-down">−</button>
+    <span id="sz-val">16</span>
+    <button class="tb-btn" id="sz-up">+</button>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <span class="tb-label">굵기</span>
+    <button class="tb-btn weight-btn" data-w="300">Thin</button>
+    <button class="tb-btn weight-btn active" data-w="400">Regular</button>
+    <button class="tb-btn weight-btn" data-w="700">Bold</button>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <span class="tb-label">색상</span>
+    <button class="color-dot active" id="col-black" data-c="#1a1a1a" title="검정" style="background:#1a1a1a;"></button>
+    <button class="color-dot" id="col-blue" data-c="#2563eb" title="파랑" style="background:#2563eb;"></button>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <button class="tb-btn action" id="btn-add-child">+ 자식 추가</button>
+    <button class="tb-btn action" id="btn-add-sibling">+ 형제 추가</button>
+    <button class="tb-btn action danger" id="btn-delete">삭제</button>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <button class="tb-btn action" id="btn-save">저장</button>
+    <button class="tb-btn action" id="btn-json-export" title="파일로 백업">JSON 백업</button>
+    <button class="tb-btn action" id="btn-json-import" title="백업 파일 불러오기">JSON 복구</button>
+    <button class="tb-btn action" id="btn-export">↓ PNG 저장</button>
+  </div>
+</div>
+
+<!-- Canvas -->
+<div id="canvas-wrap">
+  <div id="canvas" tabindex="0">
+    <svg id="svg-layer"></svg>
+    <div id="tree-layer"></div>
+  </div>
+</div>
+
+<!-- Hint -->
+<div id="hint">클릭으로 선택 · 더블클릭으로 편집 · Tab으로 자식 추가 · Enter로 형제 추가 · Delete로 삭제</div>
+
+<script type="module" src="mindmap.js"></script>
+</body>
+</html>
