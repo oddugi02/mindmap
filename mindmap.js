@@ -1,3 +1,27 @@
+// ─── Firebase Init ────────────────────────────────────────────────────────────
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAFV1o3777TorEDXPAb6SSJbn5bXtYlGiE",
+  authDomain: "mindmap-43bac.firebaseapp.com",
+  projectId: "mindmap-43bac",
+  storageBucket: "mindmap-43bac.firebasestorage.app",
+  messagingSenderId: "44458661795",
+  appId: "1:44458661795:web:1d2e362cbacc8af056ec16"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// URL Parameter Handling (Room ID)
+const params = new URLSearchParams(window.location.search);
+let roomId = params.get('id');
+if (!roomId) {
+  roomId = Math.random().toString(36).slice(2, 8);
+  window.history.replaceState(null, '', `?id=${roomId}`);
+}
+const docRef = doc(db, 'mindmaps', roomId);
+
 // ─── Data Store ──────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'treemap_v1';
 
@@ -23,8 +47,14 @@ const szVal     = document.getElementById('sz-val');
 
 // ─── Save / Load ──────────────────────────────────────────────────────────────
 // ─── Save / Load ──────────────────────────────────────────────────────────────
+let saveTimeout = null;
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
+  // Firebase save (debounced)
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    setDoc(docRef, { tree }).catch(console.error);
+  }, 400);
 }
 
 // 사용자님의 스크린샷 바탕으로 복구한 데이터
@@ -131,22 +161,59 @@ function prepareData(node) {
   return node;
 }
 
-function load() {
+/* Firebase 실시간 동기화 설정 */
+let isFirstLoad = true;
+function setupRealtime() {
+  onSnapshot(docRef, { includeMetadataChanges: true }, (docSnap) => {
+    if (docSnap.metadata.hasPendingWrites) return; // 내가 저장한 내역이면 리렌더 방지
+    if (!docSnap.exists()) return;
+    const data = docSnap.data();
+    if (data.tree) {
+      tree = prepareData(data.tree);
+      if (!isFirstLoad) {
+        render(); // 다른 기기에서 바꿨을 때 새로고침
+        if (selectedId) selectNode(selectedId);
+      }
+    }
+  });
+}
+
+async function load() {
+  try {
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      if (data.tree) {
+        tree = prepareData(data.tree);
+        setupRealtime();
+        isFirstLoad = false;
+        return;
+      }
+    }
+  } catch (err) {
+    console.error("Firebase fetch error", err);
+  }
+
+  // Not found in firebase -> Read local or create fresh
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw !== null) {
     try {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.text) {
-        tree = parsed;
+        tree = prepareData(parsed);
+        save();
+        setupRealtime();
+        isFirstLoad = false;
         return;
       }
     } catch(e) {}
   }
   
-  // 최초 방문이거나 데이터가 아예 없는 경우에만 복구용 데이터 로드
   console.log("Starting fresh or restoring from recovery data...");
   tree = prepareData(JSON.parse(JSON.stringify(RECOVERY_DATA))); 
   save();
+  setupRealtime();
+  isFirstLoad = false;
 }
 
 function exportJSON() {
@@ -752,6 +819,9 @@ window.addEventListener('resize', () => requestAnimationFrame(drawLines));
 document.getElementById('canvas-wrap').addEventListener('scroll', () => requestAnimationFrame(drawLines));
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
-load();
-render();
-syncToolbarUI();
+async function boot() {
+  await load();
+  render();
+  syncToolbarUI();
+}
+boot();
