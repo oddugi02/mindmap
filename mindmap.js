@@ -582,6 +582,8 @@ function applyStyleToSelected(patch) {
     if (!selfEl) return;
     const lbl = selfEl.querySelector('.node-label');
     const bul = selfEl.querySelector('.node-bullet');
+    if (!lbl || !bul) return; // Safety check
+    
     if (patch.size   !== undefined) lbl.style.fontSize   = patch.size + 'px';
     if (patch.weight !== undefined) lbl.style.fontWeight = patch.weight;
     if (patch.color  !== undefined) {
@@ -735,6 +737,15 @@ function selectAll() {
   };
   collect(tree);
   renderSelection();
+  
+  // Sync toolbar to the first node of everything
+  const node = findNode(selectedIds[0]);
+  if (node) {
+    tb.size = node.size;
+    tb.weight = node.weight;
+    tb.color = node.color;
+    syncToolbarUI();
+  }
 }
 
 // Click on empty area = deselect or start marquee
@@ -808,12 +819,9 @@ function detectMarqueeSelection(mLeft, mTop, mWidth, mHeight) {
     const label = wrap.querySelector('.node-label');
     const lRect = label.getBoundingClientRect();
     
-    // Label rect relative to canvas
-    const x = lRect.left - canvasRect.left + canvasWrap.scrollLeft + canvasWrap.scrollLeft * 0; // scroll handling check
-    // Actually, getBoundingClientRect is relative to viewport. 
-    // Let's get label center relative to canvas to simplify.
-    const lLeft = lRect.left - canvasRect.left + canvasWrap.scrollLeft;
-    const lTop  = lRect.top - canvasRect.top + canvasWrap.scrollTop;
+    // Label rect relative to canvas origin
+    const lLeft = lRect.left - canvasRect.left;
+    const lTop  = lRect.top - canvasRect.top;
     const lRight = lLeft + lRect.width;
     const lBottom = lTop + lRect.height;
     
@@ -824,6 +832,17 @@ function detectMarqueeSelection(mLeft, mTop, mWidth, mHeight) {
   
   selectedIds = newSelection;
   renderSelection();
+
+  // Sync toolbar to the selection
+  if (selectedIds.length > 0) {
+    const node = findNode(selectedIds[0]);
+    if (node) {
+      tb.size = node.size;
+      tb.weight = node.weight;
+      tb.color = node.color;
+      syncToolbarUI();
+    }
+  }
 }
 
 // ─── Export PNG ───────────────────────────────────────────────────────────────
