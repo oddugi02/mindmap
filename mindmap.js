@@ -254,7 +254,7 @@ function importJSON() {
         const data = JSON.parse(re.target.result);
         if (data && data.text) {
           if (confirm("현재 내용을 덮어쓰고 백업 파일을 불러올까요?")) {
-            tree = data;
+            tree = prepareData(data); // 데이터 스키마 보정 (아이디, 사이즈 등 부여)
             save();
             render();
           }
@@ -850,15 +850,34 @@ function detectMarqueeSelection(mLeft, mTop, mWidth, mHeight) {
 }
 
 // ─── Export PNG ───────────────────────────────────────────────────────────────
-document.getElementById('btn-export').addEventListener('click', exportPNG);
+document.getElementById('btn-export').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-export');
+  const origText = btn.textContent;
+  btn.textContent = '생성 중...';
+  btn.disabled = true;
 
-function exportPNG() {
-  const SCALE = 2.5;
+  try {
+    await exportPNG();
+  } catch (e) {
+    console.error(e);
+    alert('PNG 저장 중 오류가 발생했습니다.');
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+});
+
+async function exportPNG() {
+  const SCALE = 3.0; // 해상도 상향 (2.5 -> 3.0)
   const PAD   = 80;
 
-  // Collect all bullet positions to determine bounding box
+  // 폰트가 완전히 로드될 때까지 대기
+  await document.fonts.ready;
+
+  // Collect all positions to determine bounding box
   const selfEls = treeLayer.querySelectorAll('.node-self');
   const canvasEl = document.getElementById('canvas');
+  // root canvas relative to viewport
   const canvasRect = canvasEl.getBoundingClientRect();
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -866,13 +885,14 @@ function exportPNG() {
   selfEls.forEach(el => {
     const bul = el.querySelector('.node-bullet');
     const lbl = el.querySelector('.node-label');
-    const br  = el.getBoundingClientRect();
-    const tr  = lbl.getBoundingClientRect();
+    const br  = bul.getBoundingClientRect();
+    const lr  = lbl.getBoundingClientRect();
 
-    const x1 = bul.getBoundingClientRect().left - canvasRect.left + canvasEl.scrollLeft;
-    const y1 = br.top  - canvasRect.top  + canvasEl.scrollTop;
-    const x2 = tr.right  - canvasRect.left + canvasEl.scrollLeft;
-    const y2 = br.bottom - canvasRect.top  + canvasEl.scrollTop;
+    // canvasRect offset (scrolling is naturally handled by getBoundingClientRect)
+    const x1 = br.left - canvasRect.left;
+    const y1 = Math.min(br.top, lr.top) - canvasRect.top;
+    const x2 = lr.right - canvasRect.left;
+    const y2 = Math.max(br.bottom, lr.bottom) - canvasRect.top;
 
     minX = Math.min(minX, x1);
     minY = Math.min(minY, y1);
@@ -891,6 +911,8 @@ function exportPNG() {
   cvs.width  = W * SCALE;
   cvs.height = H * SCALE;
   const ctx  = cvs.getContext('2d');
+  
+  // High DPI support
   ctx.scale(SCALE, SCALE);
 
   // White bg
@@ -955,14 +977,17 @@ function exportPNG() {
     ctx.arc(bx, by, 4.5, 0, Math.PI * 2);
     ctx.fillStyle = 'white';
     ctx.fill();
-    ctx.strokeStyle = node.color;
+    ctx.strokeStyle = node.color || '#1a1a1a';
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Label text
-    ctx.font = `${node.weight} ${node.size}px "Noto Sans KR", sans-serif`;
-    ctx.fillStyle = node.color;
+    const size = node.size || 30;
+    const weight = node.weight || 400;
+    ctx.font = `${weight} ${size}px "Noto Sans KR", sans-serif`;
+    ctx.fillStyle = node.color || '#1a1a1a';
     ctx.textBaseline = 'middle';
+    
     const lr = lbl.getBoundingClientRect();
     const lx = lr.left - canvasRect.left + ox + 8;
     const ly = lr.top  + lr.height / 2 - canvasRect.top + oy;
@@ -974,7 +999,7 @@ function exportPNG() {
 
   // Download
   const link = document.createElement('a');
-  link.download = '마인드맵.png';
+  link.download = `마인드맵_${new Date().getTime()}.png`;
   link.href = cvs.toDataURL('image/png');
   link.click();
 }
