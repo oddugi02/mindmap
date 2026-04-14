@@ -29,7 +29,7 @@ let tree = null;       // root node object
 let selectedId = null; // currently selected node id
 
 // Node schema: { id, text, size, weight, color, children: [] }
-function makeNode(text = '키워드', size = 16, weight = 400, color = '#1a1a1a') {
+function makeNode(text = '키워드', size = 18, weight = 400, color = '#1a1a1a') {
   return {
     id: 'n' + Date.now() + Math.random().toString(36).slice(2, 7),
     text, size, weight, color,
@@ -38,7 +38,7 @@ function makeNode(text = '키워드', size = 16, weight = 400, color = '#1a1a1a'
 }
 
 // ─── Toolbar State ────────────────────────────────────────────────────────────
-let tb = { size: 16, weight: 400, color: '#1a1a1a' };
+let tb = { size: 18, weight: 400, color: '#1a1a1a' };
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const treeLayer = document.getElementById('tree-layer');
@@ -59,10 +59,10 @@ function save() {
 
 // 사용자님의 스크린샷 바탕으로 복구한 데이터
 const RECOVERY_DATA = {
-  text: "안의(安意)", size: 24, weight: 700, color: "#1a1a1a",
+  text: "안의(安意)", size: 28, weight: 700, color: "#1a1a1a",
   children: [
-    { text: "신념", size: 18, weight: 700, color: "#2563eb", children: [
-      { text: "공동체", size: 16, weight: 700, color: "#1a1a1a", children: [
+    { text: "신념", size: 22, weight: 700, color: "#2563eb", children: [
+      { text: "공동체", size: 18, weight: 700, color: "#1a1a1a", children: [
         { text: "계승", children: [
           { text: "지속", children: [
             { text: "반복", children: [{ text: "연속성" }, { text: "복제" }] },
@@ -125,7 +125,7 @@ const RECOVERY_DATA = {
       ]},
       { text: "자아" }
     ]},
-    { text: "침묵", size: 18, weight: 700, color: "#2563eb", children: [
+    { text: "침묵", size: 22, weight: 700, color: "#2563eb", children: [
       { text: "수련", children: [
         { text: "고독", children: [{ text: "소외" }, { text: "고립" }] },
         { text: "수양", children: [{ text: "내면집중" }, { text: "자가검열" }, { text: "집중", children: [{text:"집착"}] }] }
@@ -139,8 +139,8 @@ const RECOVERY_DATA = {
         { text: "통제", children: [{ text: "억압" }, { text: "은폐", children: [{text:"부재"},{text:"그림자"}] }] }
       ]}
     ]},
-    { text: "비언어", size: 18, weight: 700, color: "#2563eb" },
-    { text: "자연", size: 18, weight: 700, color: "#2563eb", children: [
+    { text: "비언어", size: 22, weight: 700, color: "#2563eb" },
+    { text: "자연", size: 22, weight: 700, color: "#2563eb", children: [
       { text: "이정표", children: [
         { text: "어머니", children: [{ text: "품" }, { text: "가르침", children: [{text:"확장", children:[{text:"세계관"}]}] }] },
         { text: "길", children: [{ text: "인도" }] }
@@ -153,7 +153,7 @@ const RECOVERY_DATA = {
 // 재귀적으로 ID와 기본 스타일 부여
 function prepareData(node) {
   if (!node.id) node.id = 'n' + Date.now() + Math.random().toString(36).slice(2, 7);
-  if (node.size === undefined) node.size = 16;
+  if (node.size === undefined) node.size = 18;
   if (node.weight === undefined) node.weight = 400;
   if (node.color === undefined) node.color = '#1a1a1a';
   if (!node.children) node.children = [];
@@ -380,7 +380,7 @@ function drawNodeLines(node) {
 
     // 직선적(Orthogonal) 구조: 90도 꺾인 선
     // 부모 점(px, py) -> 중간 지점(midX, py) -> 자식 높이(midX, cy) -> 자식 점(cx, cy)
-    const midX = px + 28; // 고정 오프셋이 구조를 더 단단하게 보여줌
+    const midX = px + 24; // 고정 오프셋이 구조를 더 단단하게 보여줌
     
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', `M ${px} ${py} L ${midX} ${py} L ${midX} ${cy} L ${cx} ${cy}`);
@@ -757,7 +757,7 @@ function exportPNG() {
       const cx   = cb.left + cb.width  / 2 - canvasRect.left + ox;
       const cy   = cb.top  + cb.height / 2 - canvasRect.top  + oy;
       
-      const midX = px + 28;
+      const midX = px + 24;
 
       ctx.beginPath();
       ctx.moveTo(px, py);
