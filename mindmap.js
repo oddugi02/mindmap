@@ -563,7 +563,7 @@ function deleteNode(id) {
   const parent = findParent(id);
   if (!parent) return;
   parent.children = parent.children.filter(c => c.id !== id);
-  selectedId = null;
+  selectedIds = [];
   save();
   render();
 }
@@ -582,14 +582,17 @@ function applyStyleToSelected(patch) {
     if (!selfEl) return;
     const lbl = selfEl.querySelector('.node-label');
     const bul = selfEl.querySelector('.node-bullet');
-    if (!lbl || !bul) return; // Safety check
+    if (!lbl || !bul) return;
     
-    if (patch.size   !== undefined) lbl.style.fontSize   = patch.size + 'px';
-    if (patch.weight !== undefined) lbl.style.fontWeight = patch.weight;
-    if (patch.color  !== undefined) {
-      lbl.style.color = patch.color;
-      bul.style.color = patch.color;
-      bul.style.borderColor = patch.color;
+    // Use a local copy of patch to avoid reuse issues if any
+    const localPatch = { ...patch };
+    
+    if (localPatch.size   !== undefined) lbl.style.fontSize   = localPatch.size + 'px';
+    if (localPatch.weight !== undefined) lbl.style.fontWeight = localPatch.weight;
+    if (localPatch.color  !== undefined) {
+      lbl.style.color = localPatch.color;
+      bul.style.color = localPatch.color;
+      bul.style.borderColor = localPatch.color;
     }
   });
 
@@ -677,6 +680,7 @@ document.getElementById('btn-save').addEventListener('click', () => {
 
 document.getElementById('btn-json-export').addEventListener('click', exportJSON);
 document.getElementById('btn-json-import').addEventListener('click', importJSON);
+document.getElementById('btn-select-all').addEventListener('click', selectAll);
 
 document.getElementById('btn-new').addEventListener('click', () => {
   if (confirm('현재 작업을 모두 지우고 새로운 마인드맵을 만들까요?')) {
