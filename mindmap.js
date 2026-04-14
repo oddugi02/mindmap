@@ -29,7 +29,7 @@ let tree = null;       // root node object
 let selectedId = null; // currently selected node id
 
 // Node schema: { id, text, size, weight, color, children: [] }
-function makeNode(text = '키워드', size = 18, weight = 400, color = '#1a1a1a') {
+function makeNode(text = '키워드', size = 30, weight = 400, color = '#1a1a1a') {
   return {
     id: 'n' + Date.now() + Math.random().toString(36).slice(2, 7),
     text, size, weight, color,
@@ -38,7 +38,7 @@ function makeNode(text = '키워드', size = 18, weight = 400, color = '#1a1a1a'
 }
 
 // ─── Toolbar State ────────────────────────────────────────────────────────────
-let tb = { size: 18, weight: 400, color: '#1a1a1a' };
+let tb = { size: 30, weight: 400, color: '#1a1a1a' };
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const treeLayer = document.getElementById('tree-layer');
@@ -59,10 +59,10 @@ function save() {
 
 // 사용자님의 스크린샷 바탕으로 복구한 데이터
 const RECOVERY_DATA = {
-  text: "안의(安意)", size: 28, weight: 700, color: "#1a1a1a",
+  text: "안의(安意)", size: 30, weight: 700, color: "#1a1a1a",
   children: [
-    { text: "신념", size: 22, weight: 700, color: "#2563eb", children: [
-      { text: "공동체", size: 18, weight: 700, color: "#1a1a1a", children: [
+    { text: "신념", size: 30, weight: 700, color: "#2563eb", children: [
+      { text: "공동체", size: 30, weight: 700, color: "#1a1a1a", children: [
         { text: "계승", children: [
           { text: "지속", children: [
             { text: "반복", children: [{ text: "연속성" }, { text: "복제" }] },
@@ -125,7 +125,7 @@ const RECOVERY_DATA = {
       ]},
       { text: "자아" }
     ]},
-    { text: "침묵", size: 22, weight: 700, color: "#2563eb", children: [
+    { text: "침묵", size: 30, weight: 700, color: "#2563eb", children: [
       { text: "수련", children: [
         { text: "고독", children: [{ text: "소외" }, { text: "고립" }] },
         { text: "수양", children: [{ text: "내면집중" }, { text: "자가검열" }, { text: "집중", children: [{text:"집착"}] }] }
@@ -139,8 +139,8 @@ const RECOVERY_DATA = {
         { text: "통제", children: [{ text: "억압" }, { text: "은폐", children: [{text:"부재"},{text:"그림자"}] }] }
       ]}
     ]},
-    { text: "비언어", size: 22, weight: 700, color: "#2563eb" },
-    { text: "자연", size: 22, weight: 700, color: "#2563eb", children: [
+    { text: "비언어", size: 30, weight: 700, color: "#2563eb" },
+    { text: "자연", size: 30, weight: 700, color: "#2563eb", children: [
       { text: "이정표", children: [
         { text: "어머니", children: [{ text: "품" }, { text: "가르침", children: [{text:"확장", children:[{text:"세계관"}]}] }] },
         { text: "길", children: [{ text: "인도" }] }
@@ -153,7 +153,7 @@ const RECOVERY_DATA = {
 // 재귀적으로 ID와 기본 스타일 부여
 function prepareData(node) {
   if (!node.id) node.id = 'n' + Date.now() + Math.random().toString(36).slice(2, 7);
-  if (node.size === undefined) node.size = 18;
+  if (node.size === undefined) node.size = 30;
   if (node.weight === undefined) node.weight = 400;
   if (node.color === undefined) node.color = '#1a1a1a';
   if (!node.children) node.children = [];
@@ -214,6 +214,18 @@ async function load() {
   save();
   setupRealtime();
   isFirstLoad = false;
+
+  // 기존 노드들을 한 번위해 30으로 일괄 변환 (마이그레이션)
+  const migrateTo30 = (n) => {
+    n.size = 30;
+    if (n.children) n.children.forEach(migrateTo30);
+  };
+  if (tree && !localStorage.getItem('migrated_size_30')) {
+    migrateTo30(tree);
+    save();
+    localStorage.setItem('migrated_size_30', 'true');
+    render(); // 반영을 위해 리렌더링
+  }
 }
 
 function exportJSON() {
@@ -640,7 +652,7 @@ document.getElementById('btn-json-import').addEventListener('click', importJSON)
 
 document.getElementById('btn-new').addEventListener('click', () => {
   if (confirm('현재 작업을 모두 지우고 새로운 마인드맵을 만들까요?')) {
-    tree = makeNode('새로운 주제', 24, 700, '#1a1a1a');
+    tree = makeNode('새로운 주제', 30, 700, '#1a1a1a');
     save();
     render();
     deselect();
