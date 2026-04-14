@@ -26,7 +26,7 @@ const docRef = doc(db, 'mindmaps', roomId);
 const STORAGE_KEY = 'treemap_v1';
 
 let tree = null;       // root node object
-let selectedId = null; // currently selected node id
+let selectedIds = []; // currently selected node ids
 
 // Node schema: { id, text, size, weight, color, children: [] }
 function makeNode(text = '키워드', size = 30, weight = 400, color = '#1a1a1a') {
@@ -172,7 +172,10 @@ function setupRealtime() {
       tree = prepareData(data.tree);
       if (!isFirstLoad) {
         render(); // 다른 기기에서 바꿨을 때 새로고침
-        if (selectedId) selectNode(selectedId);
+        if (selectedIds.length > 0) {
+          // 다건 선택 상태 유지 (단, 삭제된 노드가 있을 수 있으므로 필터링 필요할 수 있음)
+          renderSelection();
+        }
       }
     }
   });
@@ -299,7 +302,7 @@ function renderNode(node, container, depth) {
   const wrap = document.createElement('div');
   wrap.className = 'node-wrap';
   wrap.dataset.id = node.id;
-  if (node.id === selectedId) wrap.classList.add('selected');
+  if (selectedIds.includes(node.id)) wrap.classList.add('selected');
 
   // Self: bullet + label
   const self = document.createElement('div');
@@ -339,7 +342,8 @@ function renderNode(node, container, depth) {
   // Single click: select
   self.addEventListener('mousedown', (e) => {
     e.stopPropagation();
-    selectNode(node.id);
+    // Shift 키가 들려있으면 다중 선택, 아니면 단일 선택
+    selectNode(node.id, e.shiftKey || e.metaKey || e.ctrlKey);
   });
 
   // Double click: edit
@@ -413,15 +417,22 @@ function getSelfEl(id) {
 
 
 // ─── Selection ────────────────────────────────────────────────────────────────
-function selectNode(id) {
-  selectedId = id;
-  // Re-apply selected class without full re-render
-  document.querySelectorAll('.node-wrap').forEach(el => {
-    el.classList.toggle('selected', el.dataset.id === id);
-  });
+function selectNode(id, append = false) {
+  if (append) {
+    if (selectedIds.includes(id)) {
+      selectedIds = selectedIds.filter(sid => sid !== id);
+    } else {
+      selectedIds.push(id);
+    }
+  } else {
+    selectedIds = [id];
+  }
+  
+  renderSelection();
 
-  // Sync toolbar to node's current style
-  const node = findNode(id);
+  // Sync toolbar to the first/most recent selected node
+  const lastId = selectedIds[selectedIds.length - 1];
+  const node = findNode(lastId);
   if (node) {
     tb.size   = node.size;
     tb.weight = node.weight;
@@ -430,9 +441,15 @@ function selectNode(id) {
   }
 }
 
+function renderSelection() {
+  document.querySelectorAll('.node-wrap').forEach(el => {
+    el.classList.toggle('selected', selectedIds.includes(el.dataset.id));
+  });
+}
+
 function deselect() {
-  selectedId = null;
-  document.querySelectorAll('.node-wrap').forEach(el => el.classList.remove('selected'));
+  selectedIds = [];
+  renderSelection();
 }
 
 // ─── Editing ──────────────────────────────────────────────────────────────────
@@ -553,26 +570,31 @@ function deleteNode(id) {
 
 // ─── Style Updates ────────────────────────────────────────────────────────────
 function applyStyleToSelected(patch) {
-  if (!selectedId) return;
-  const node = findNode(selectedId);
-  if (!node) return;
-  Object.assign(node, patch);
+  if (selectedIds.length === 0) return;
+  
+  selectedIds.forEach(id => {
+    const node = findNode(id);
+    if (!node) return;
+    Object.assign(node, patch);
+    
+    // Update DOM directly for performance
+    const selfEl = getSelfEl(id);
+    if (!selfEl) return;
+    const lbl = selfEl.querySelector('.node-label');
+    const bul = selfEl.querySelector('.node-bullet');
+    if (patch.size   !== undefined) lbl.style.fontSize   = patch.size + 'px';
+    if (patch.weight !== undefined) lbl.style.fontWeight = patch.weight;
+    if (patch.color  !== undefined) {
+      lbl.style.color = patch.color;
+      bul.style.color = patch.color;
+      bul.style.borderColor = patch.color;
+    }
+  });
+
   Object.assign(tb, patch);
   syncToolbarUI();
   save();
 
-  // Update DOM directly (no re-render needed)
-  const selfEl = getSelfEl(selectedId);
-  if (!selfEl) return;
-  const lbl = selfEl.querySelector('.node-label');
-  const bul = selfEl.querySelector('.node-bullet');
-  if (patch.size   !== undefined) lbl.style.fontSize   = patch.size + 'px';
-  if (patch.weight !== undefined) lbl.style.fontWeight = patch.weight;
-  if (patch.color  !== undefined) {
-    lbl.style.color = patch.color;
-    bul.style.color = patch.color;
-    bul.style.borderColor = patch.color;
-  }
   // Redraw lines because label size may have changed
   requestAnimationFrame(drawLines);
 }
@@ -591,20 +613,20 @@ function syncToolbarUI() {
 document.getElementById('sz-up').addEventListener('click', () => {
   const s = Math.min((tb.size || 16) + 2, 48);
   applyStyleToSelected({ size: s });
-  if (!selectedId) { tb.size = s; syncToolbarUI(); }
+  if (selectedIds.length === 0) { tb.size = s; syncToolbarUI(); }
 });
 
 document.getElementById('sz-down').addEventListener('click', () => {
   const s = Math.max((tb.size || 16) - 2, 8);
   applyStyleToSelected({ size: s });
-  if (!selectedId) { tb.size = s; syncToolbarUI(); }
+  if (selectedIds.length === 0) { tb.size = s; syncToolbarUI(); }
 });
 
 document.querySelectorAll('.weight-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const w = parseInt(btn.dataset.w);
     applyStyleToSelected({ weight: w });
-    if (!selectedId) { tb.weight = w; syncToolbarUI(); }
+    if (selectedIds.length === 0) { tb.weight = w; syncToolbarUI(); }
   });
 });
 
@@ -612,23 +634,27 @@ document.querySelectorAll('.color-dot').forEach(btn => {
   btn.addEventListener('click', () => {
     const c = btn.dataset.c;
     applyStyleToSelected({ color: c });
-    if (!selectedId) { tb.color = c; syncToolbarUI(); }
+    if (selectedIds.length === 0) { tb.color = c; syncToolbarUI(); }
   });
 });
 
 document.getElementById('btn-add-child').addEventListener('click', () => {
-  if (!selectedId) return alert('먼저 노드를 선택하세요.');
-  addChildTo(selectedId);
+  if (selectedIds.length === 0) return alert('먼저 노드를 선택하세요.');
+  addChildTo(selectedIds[selectedIds.length - 1]);
 });
 
 document.getElementById('btn-add-sibling').addEventListener('click', () => {
-  if (!selectedId) return alert('먼저 노드를 선택하세요.');
-  addSiblingAfter(selectedId);
+  if (selectedIds.length === 0) return alert('먼저 노드를 선택하세요.');
+  addSiblingAfter(selectedIds[selectedIds.length - 1]);
 });
 
 document.getElementById('btn-delete').addEventListener('click', () => {
-  if (!selectedId) return alert('먼저 노드를 선택하세요.');
-  if (confirm('선택한 노드와 모든 자식을 삭제할까요?')) deleteNode(selectedId);
+  if (selectedIds.length === 0) return alert('먼저 노드를 선택하세요.');
+  if (confirm(`${selectedIds.length}개의 노드와 모든 자식을 삭제할까요?`)) {
+    const idsToDelete = [...selectedIds];
+    idsToDelete.forEach(id => deleteNode(id));
+    deselect();
+  }
 });
 
 document.getElementById('btn-save').addEventListener('click', () => {
@@ -664,37 +690,141 @@ document.getElementById('btn-new').addEventListener('click', () => {
 document.addEventListener('keydown', (e) => {
   // Ignore if inside editable
   if (document.activeElement && document.activeElement.contentEditable === 'true') return;
-  if (!selectedId) return;
+  
+  // Select All (Cmd+A or Ctrl+A)
+  if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+    e.preventDefault();
+    selectAll();
+    return;
+  }
+
+  if (selectedIds.length === 0) return;
+
+  const lastId = selectedIds[selectedIds.length - 1];
 
   if (e.key === 'Tab') {
     e.preventDefault();
-    addChildTo(selectedId);
+    addChildTo(lastId);
   }
   if (e.key === 'Enter') {
     e.preventDefault();
-    addSiblingAfter(selectedId);
+    addSiblingAfter(lastId);
   }
   if (e.key === 'Delete' || e.key === 'Backspace') {
     if (document.activeElement.tagName !== 'INPUT') {
       e.preventDefault();
-      if (confirm('삭제할까요?')) deleteNode(selectedId);
+      if (confirm(`${selectedIds.length}개를 삭제할까요?`)) {
+        const ids = [...selectedIds];
+        ids.forEach(id => deleteNode(id));
+        deselect();
+      }
     }
   }
   if (e.key === 'F2') {
-    const lbl = treeLayer.querySelector(`.node-self[data-id="${selectedId}"] .node-label`);
-    if (lbl) startEdit(selectedId, lbl);
+    const lbl = treeLayer.querySelector(`.node-self[data-id="${lastId}"] .node-label`);
+    if (lbl) startEdit(lastId, lbl);
   }
   if (e.key === 'Escape') deselect();
 });
 
-// Click on empty area = deselect
+function selectAll() {
+  selectedIds = [];
+  const collect = (node) => {
+    selectedIds.push(node.id);
+    node.children.forEach(collect);
+  };
+  collect(tree);
+  renderSelection();
+}
+
+// Click on empty area = deselect or start marquee
+let marqueeBox = null;
+let startX, startY;
+
 document.getElementById('canvas-wrap').addEventListener('mousedown', (e) => {
-  if (e.target === document.getElementById('canvas-wrap') ||
-      e.target === document.getElementById('canvas') ||
-      e.target === svgLayer) {
+  const isCanvasTarget = e.target === document.getElementById('canvas-wrap') ||
+                         e.target === document.getElementById('canvas') ||
+                         e.target === svgLayer;
+                         
+  if (!isCanvasTarget) return;
+
+  if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
     deselect();
   }
+  
+  // Start marquee
+  const canvasRect = canvasWrap.getBoundingClientRect();
+  startX = e.clientX - canvasRect.left + canvasWrap.scrollLeft;
+  startY = e.clientY - canvasRect.top + canvasWrap.scrollTop;
+  
+  marqueeBox = document.createElement('div');
+  marqueeBox.className = 'selection-box';
+  marqueeBox.style.left = startX + 'px';
+  marqueeBox.style.top = startY + 'px';
+  canvasEl.appendChild(marqueeBox);
+  
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
 });
+
+function onMouseMove(e) {
+  if (!marqueeBox) return;
+  const canvasRect = canvasWrap.getBoundingClientRect();
+  const curX = e.clientX - canvasRect.left + canvasWrap.scrollLeft;
+  const curY = e.clientY - canvasRect.top + canvasWrap.scrollTop;
+  
+  const left   = Math.min(startX, curX);
+  const top    = Math.min(startY, curY);
+  const width  = Math.abs(curX - startX);
+  const height = Math.abs(curY - startY);
+  
+  marqueeBox.style.left   = left + 'px';
+  marqueeBox.style.top    = top + 'px';
+  marqueeBox.style.width  = width + 'px';
+  marqueeBox.style.height = height + 'px';
+  
+  // Real-time selection preview
+  detectMarqueeSelection(left, top, width, height);
+}
+
+function onMouseUp() {
+  if (marqueeBox) {
+    marqueeBox.remove();
+    marqueeBox = null;
+  }
+  window.removeEventListener('mousemove', onMouseMove);
+  window.removeEventListener('mouseup', onMouseUp);
+}
+
+function detectMarqueeSelection(mLeft, mTop, mWidth, mHeight) {
+  const mRight = mLeft + mWidth;
+  const mBottom = mTop + mHeight;
+  
+  const canvasRect = canvasEl.getBoundingClientRect();
+  const newSelection = [];
+  
+  document.querySelectorAll('.node-wrap').forEach(wrap => {
+    const id = wrap.dataset.id;
+    const label = wrap.querySelector('.node-label');
+    const lRect = label.getBoundingClientRect();
+    
+    // Label rect relative to canvas
+    const x = lRect.left - canvasRect.left + canvasWrap.scrollLeft + canvasWrap.scrollLeft * 0; // scroll handling check
+    // Actually, getBoundingClientRect is relative to viewport. 
+    // Let's get label center relative to canvas to simplify.
+    const lLeft = lRect.left - canvasRect.left + canvasWrap.scrollLeft;
+    const lTop  = lRect.top - canvasRect.top + canvasWrap.scrollTop;
+    const lRight = lLeft + lRect.width;
+    const lBottom = lTop + lRect.height;
+    
+    // Check intersection
+    const intersect = !(lLeft > mRight || lRight < mLeft || lTop > mBottom || lBottom < mTop);
+    if (intersect) newSelection.push(id);
+  });
+  
+  selectedIds = newSelection;
+  renderSelection();
+}
 
 // ─── Export PNG ───────────────────────────────────────────────────────────────
 document.getElementById('btn-export').addEventListener('click', exportPNG);
